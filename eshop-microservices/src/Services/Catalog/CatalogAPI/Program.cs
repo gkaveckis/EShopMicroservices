@@ -1,18 +1,29 @@
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddCarter();
+
+var assembly = typeof(Program).Assembly;
+
 builder.Services.AddMediatR(cfg => 
 { 
-    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    cfg.RegisterServicesFromAssembly(assembly);
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
 });
 
+builder.Services.AddValidatorsFromAssembly(assembly);
+
+builder.Services.AddCarter();
 builder.Services.AddMarten(options =>
 {
     options.Connection(builder.Configuration.GetConnectionString("Database")!);    
 }).UseLightweightSessions();
 
+builder.Services.AddExceptionHandler<CustomExceptionHandler>();
+
 var app = builder.Build();
 
 app.MapCarter();
+
+app.UseExceptionHandler(option=> { });
 
 app.Run();
