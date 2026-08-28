@@ -1,5 +1,8 @@
 ﻿
 using Basket.API.Data;
+using Discount.Grpc;
+using JasperFx.Events.Daemon;
+using NetTopologySuite.Index.HPRtree;
 
 namespace Basket.API.Basket.StoreBasket
 {
@@ -16,12 +19,25 @@ namespace Basket.API.Basket.StoreBasket
         }
     }
 
-    public class StoreBasketHandler(IBasketRepository repository) : ICommandHandler<StoreBasketCommand, StoreBasketResult>
+    public class StoreBasketHandler(IBasketRepository repository, DiscountProtoService.DiscountProtoServiceClient discountProto) : ICommandHandler<StoreBasketCommand, StoreBasketResult>
     {
         public async Task<StoreBasketResult> Handle(StoreBasketCommand command, CancellationToken cancellationToken)
-        {
-            await repository.StoreBasket(command.Cart, cancellationToken);            
+        {            
+            await DeductDiscount(command.Cart, cancellationToken);
+
+            await repository.StoreBasket(command.Cart, cancellationToken);
+
             return new StoreBasketResult(command.Cart.UserName);
         }
+
+        private async Task DeductDiscount(ShoppingCart cart, CancellationToken cancellationToken)
+        {
+            foreach (var item in cart.Items)
+            {
+                var coupon = await discountProto.GetDiscountAsync(new GetDiscountRequest { ProductName = item.ProductName }, cancellationToken: cancellationToken);
+                item.Price -= coupon.Amount;
+            }
+        }
+
     }
 }
